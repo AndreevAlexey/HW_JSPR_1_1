@@ -9,10 +9,9 @@ import java.time.LocalDateTime;
 
 public class Connection implements Runnable{
     private final Socket socket;
-    private BufferedReader in;
     private BufferedOutputStream out;
 
-    // конструкто
+    // конструктор
     public Connection(Socket socket) {
         this.socket = socket;
     }
@@ -69,11 +68,10 @@ public class Connection implements Runnable{
              final BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              final BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream()))
         {
-            in = input;
             out = output;
             // read only request line for simplicity
             // must be in form GET /path HTTP/1.1
-            final String requestLine = in.readLine();
+            final String requestLine = input.readLine();
             // проверка на пустую строку
             if(requestLine == null) return;
             // разбиение строки
