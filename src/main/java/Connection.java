@@ -6,14 +6,28 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
-public class Connection implements Runnable{
+
+public class Connection {
     private final Socket socket;
     private BufferedOutputStream out;
+    private BufferedReader in;
 
     // конструктор
     public Connection(Socket socket) {
         this.socket = socket;
+        try {
+            out = new BufferedOutputStream(socket.getOutputStream());
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public BufferedOutputStream getOut() {
+        return out;
     }
 
     // формирование сообщения 404 Error
@@ -50,7 +64,7 @@ public class Connection implements Runnable{
     }
 
     // обработать запрос на получение файла
-    private void responseDefault(Path filePath, String mimeType) {
+    public void responseDefault(Path filePath, String mimeType) {
         try {
             final long length = Files.size(filePath);
             out.write((getHttp200Text(mimeType, length)).getBytes());
@@ -61,59 +75,59 @@ public class Connection implements Runnable{
         }
     }
 
-    // обработка запроса
-    @Override
-    public void run() {
-        try (
-             final BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-             final BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream()))
+    // получить Request
+    public Request getRequest() {
+        Request request;
+        try
         {
-            out = output;
             // read only request line for simplicity
             // must be in form GET /path HTTP/1.1
-            final String requestLine = input.readLine();
+            String requestLine = in.readLine();
             // проверка на пустую строку
-            if(requestLine == null) return;
+            if(requestLine == null)
+                return null;
             // разбиение строки
             final String[] parts = requestLine.split(" ");
             // проверка на формат строки
             if (parts.length != 3) {
                 // just close socket
-                return;
+                return null;
             }
+            // запрос
+            request = new Request(parts[0]);
             // путь к файлу
-            final String path = parts[1];
-            // ссылка на путь из списка доступных сервера
-            final ValidPaths validPaths = ValidPaths.getValueByPath(path);
-            // проверка на наличие в списке доступных
-            if (validPaths == null) {
-                // ответ Error 404
-                out.write((getHttp404Text()).getBytes());
-                out.flush();
-                return;
-            }
-            // путь к файлу
-            final Path filePath = Path.of(".", "public", path);
-            // тип содержимого файла
-            final String mimeType = Files.probeContentType(filePath);
-            // отправка ответа
-            switch (validPaths) {
-                case CLASSIC_HTML:
-                    responseClassicHtml(filePath, mimeType);
+            request.setPath(parts[1]);
+            // строки запроса
+            List<String> lines = new ArrayList<>();
+            lines.add(requestLine);
+            while ((requestLine = in.readLine()) != null) {
+                // получили пустую строку: конец блока или сообщения
+                if (requestLine.length() == 0) {
+                    // заголовки
+                    request.setHeaders(lines);
+                    lines.clear();
                     break;
-                default:
-                    responseDefault(filePath, mimeType);
-                    break;
+                }
+                lines.add(requestLine);
             }
+            // тело запроса
+            request.setBody(in.toString());
 
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            try {
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            return null;
+        }
+        return request;
+    }
+
+    // закрыть соединение
+    public void close() {
+        try {
+            out.close();
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
+
 }
