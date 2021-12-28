@@ -64,6 +64,7 @@ public class Connection implements Runnable{
         }
     }
 
+    // декодер
     private String decode(String value) {
         String result = "";
         try {
@@ -73,8 +74,9 @@ public class Connection implements Runnable{
         }
         return result;
     }
-
+    // получить список параметров из строки запроса
     private Map<String, List<String>> getQueryParams(String query) {
+        // нет параметров
         if(query == null) return null;
         String name, value;
         Map<String, List<String>> result = new HashMap<>();
@@ -103,10 +105,12 @@ public class Connection implements Runnable{
         }
         return result;
     }
-
+    // получить значение параметра
     private String getParamValue(String name) {
+        // параметра нет в мапе
         if(!queryParams.containsKey(name)) return null;
         StringBuilder result = new StringBuilder();
+        // список значений
         List<String> values = queryParams.get(name);
         switch (values.size()) {
             case 0:
@@ -121,6 +125,7 @@ public class Connection implements Runnable{
         }
         return result.toString();
     }
+
     // обработка запроса
     @Override
     public void run() {
