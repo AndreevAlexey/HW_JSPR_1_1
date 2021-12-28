@@ -13,6 +13,7 @@ public class Connection implements Runnable{
     private static final int LIMIT = 4096;
 
     private Map<String, List<String>> queryParams;
+    private Map<String, List<String>> bodyParams;
 
     // конструктор
     public Connection(Socket socket) {
@@ -51,9 +52,29 @@ public class Connection implements Runnable{
             exp.printStackTrace();
         }
     }
+    // ответ на запрос Error
+    private void badRequest(BufferedOutputStream out) throws IOException {
+        out.write(getHttp404Text().getBytes());
+        out.flush();
+    }
 
-    // обработать запрос на получение файла
-    private void responseDefault(Path filePath, String mimeType) {
+    // положительный ответ на запрос
+    private void response200() {
+        try {
+            out.write((
+                    "HTTP/1.1 200 OK\r\n" +
+                            "Content-Length: 0\r\n" +
+                            "Connection: close\r\n" +
+                            "\r\n"
+            ).getBytes());
+            out.flush();
+        } catch (IOException exp) {
+            exp.printStackTrace();
+        }
+    }
+
+    // ответ на запрос на получение файла
+    private void responseDefaultGET(Path filePath, String mimeType) {
         try {
             final long length = Files.size(filePath);
             out.write((getHttp200Text(mimeType, length)).getBytes());
@@ -104,6 +125,7 @@ public class Connection implements Runnable{
         return result;
     }
 
+    // получить значения параметра
     private String getParamValue(String name) {
         if(!queryParams.containsKey(name)) return null;
         StringBuilder result = new StringBuilder();
@@ -121,56 +143,120 @@ public class Connection implements Runnable{
         }
         return result.toString();
     }
+
+    // получить значения параметра
+    private List<String> getParamValuesList(String name) {
+        if(!queryParams.containsKey(name)) return null;
+        return queryParams.get(name);
+    }
+
     // обработка запроса
     @Override
     public void run() {
+        final List<String> allowedMethods = List.of("GET", "POST");
         try (
-             final BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             final BufferedInputStream in = new BufferedInputStream(socket.getInputStream());
              final BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream()))
         {
             out = output;
-            // read only request line for simplicity
-            // must be in form GET /path HTTP/1.1
-            final String requestLine = input.readLine();
-            // проверка на пустую строку
-            if(requestLine == null) return;
-            // разбиение строки
-            final String[] parts = requestLine.split(" ");
-            // проверка на формат строки
-            if (parts.length != 3) {
-                // just close socket
+            // метка на количество байт
+            in.mark(LIMIT);
+            final byte[] buffer = new byte[LIMIT];
+            final int read = in.read(buffer);
+
+            // ищем request line
+            final byte[] requestLineDelimiter = new byte[]{'\r', '\n'};
+            final int requestLineEnd = indexOf(buffer, requestLineDelimiter, 0, read);
+            if (requestLineEnd == -1) {
+                badRequest(out);
+                return;
+            }
+
+            // читаем request line
+            final String[] requestLine = new String(Arrays.copyOf(buffer, requestLineEnd)).split(" ");
+            if (requestLine.length != 3) {
+                badRequest(out);
                 return;
             }
             // путь к файлу
             String path = "";
             try {
-                URI uri = new URI(parts[1]);
+                URI uri = new URI(requestLine[1]);
                 path = uri.getPath();
                 queryParams = getQueryParams(uri.getRawQuery());
             } catch (URISyntaxException e) {
                 e.printStackTrace();
             }
-            // ссылка на путь из списка доступных сервера
-            final ValidPaths validPaths = ValidPaths.getValueByPath(path);
-            // проверка на наличие в списке доступных
-            if (validPaths == null) {
-                // ответ Error 404
-                out.write((getHttp404Text()).getBytes());
-                out.flush();
+
+            final String method = requestLine[0];
+            if (!allowedMethods.contains(method)) {
+                badRequest(out);
                 return;
             }
-            // путь к файлу
-            final Path filePath = Path.of(".", "public", path);
-            // тип содержимого файла
-            final String mimeType = Files.probeContentType(filePath);
-            // отправка ответа
-            switch (validPaths) {
-                case CLASSIC_HTML:
-                    responseClassicHtml(filePath, mimeType);
-                    break;
-                default:
-                    responseDefault(filePath, mimeType);
-                    break;
+            System.out.println(method);
+
+            if (!path.startsWith("/")) {
+                badRequest(out);
+                return;
+            }
+            System.out.println(path);
+
+            // ищем заголовки
+            final byte[] headersDelimiter = new byte[]{'\r', '\n', '\r', '\n'};
+            final int headersStart = requestLineEnd + requestLineDelimiter.length;
+            final int headersEnd = indexOf(buffer, headersDelimiter, headersStart, read);
+            if (headersEnd == -1) {
+                badRequest(out);
+                return;
+            }
+
+            // отматываем на начало буфера
+            in.reset();
+            // пропускаем requestLine
+            in.skip(headersStart);
+            // заголовки
+            final byte[] headersBytes = in.readNBytes(headersEnd - headersStart);
+            final List<String> headers = Arrays.asList(new String(headersBytes).split("\r\n"));
+            System.out.println(headers);
+
+            // POST
+            if (method.equals("POST")) {
+                in.skip(headersDelimiter.length);
+                // вычитываем Content-Length, чтобы прочитать body
+                final Optional<String> contentLength = extractHeader(headers, "Content-Length");
+                if (contentLength.isPresent()) {
+                    final int length = Integer.parseInt(contentLength.get());
+                    final byte[] bodyBytes = in.readNBytes(length);
+                    // тело запроса
+                    final String body = new String(bodyBytes);
+                    System.out.println(body);
+                    // параметры из тела запроса
+                    bodyParams = getQueryParams(body);
+                    // ответ ОК 200
+                    response200();
+                }
+            } else {
+                // ссылка на путь из списка доступных сервера
+                final ValidPaths validPaths = ValidPaths.getValueByPath(path);
+                // проверка на наличие в списке доступных
+                if (validPaths == null) {
+                    // ответ Error 404
+                    badRequest(out);
+                    return;
+                }
+                // путь к файлу
+                final Path filePath = Path.of(".", "public", path);
+                // тип содержимого файла
+                final String mimeType = Files.probeContentType(filePath);
+                // отправка ответа
+                switch (validPaths) {
+                    case CLASSIC_HTML:
+                        responseClassicHtml(filePath, mimeType);
+                        break;
+                    default:
+                        responseDefaultGET(filePath, mimeType);
+                        break;
+                }
             }
 
         } catch (IOException e) {
@@ -183,5 +269,28 @@ public class Connection implements Runnable{
             }
         }
     }
+
+    // from google guava with modifications
+    private static int indexOf(byte[] array, byte[] target, int start, int max) {
+        outer:
+        for (int i = start; i < max - target.length + 1; i++) {
+            for (int j = 0; j < target.length; j++) {
+                if (array[i + j] != target[j]) {
+                    continue outer;
+                }
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    private Optional<String> extractHeader(List<String> headers, String header) {
+        return headers.stream()
+                .filter(o -> o.startsWith(header))
+                .map(o -> o.substring(o.indexOf(" ")))
+                .map(String::trim)
+                .findFirst();
+    }
+
 
 }
