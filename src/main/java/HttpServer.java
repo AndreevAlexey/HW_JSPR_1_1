@@ -25,7 +25,7 @@ public class HttpServer {
                 // создание соединения
                 Connection connection = new Connection(socket);
                 // передача пулу-потоков задания
-                service.submit(connection);
+                service.execute(connection);
             }
         } catch (IOException e) {
             e.printStackTrace();

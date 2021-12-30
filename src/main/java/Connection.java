@@ -169,13 +169,10 @@ public class Connection implements Runnable{
             // тип содержимого файла
             final String mimeType = Files.probeContentType(filePath);
             // отправка ответа
-            switch (validPaths) {
-                case CLASSIC_HTML:
-                    responseClassicHtml(filePath, mimeType);
-                    break;
-                default:
-                    responseDefault(filePath, mimeType);
-                    break;
+            if (validPaths == ValidPaths.CLASSIC_HTML) {
+                responseClassicHtml(filePath, mimeType);
+            } else {
+                responseDefault(filePath, mimeType);
             }
 
         } catch (IOException e) {

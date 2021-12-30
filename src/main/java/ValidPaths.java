@@ -9,7 +9,7 @@ public enum ValidPaths {
     LINKS_HTML,
     FORMS_HTML,
     EVENTS_HTML,
-    EVANTS_JS;
+    EVENTS_JS;
 
     @Override
     public String toString() {
@@ -17,18 +17,6 @@ public enum ValidPaths {
                 this.name()
                 .toLowerCase()
                 .replace('_', '.');
-    }
-
-    // проверить наличие пути в списке возможных
-    public static boolean checkPath(String path) {
-        String str = path.replace("/","").replace('.', '_').toUpperCase();
-        boolean result = true;
-        try {
-            ValidPaths.valueOf(str);
-        } catch (IllegalArgumentException e) {
-            result = false;
-        }
-        return result;
     }
 
     // получить ссылку на путь из списка возможных
