@@ -11,6 +11,9 @@ public class Connection implements Runnable{
     private final Socket socket;
     private BufferedOutputStream out;
     private static final int LIMIT = 4096;
+    private static final List<String> allowedMethods = List.of("GET", "POST");
+    private static final String xwwwform = "application/x-www-form-urlencoded";
+    private static final String multipart = "multipart/form-data";
 
     private Map<String, List<String>> queryParams;
     private Map<String, List<String>> bodyParams;
@@ -85,6 +88,7 @@ public class Connection implements Runnable{
         }
     }
 
+    // декодер
     private String decode(String value) {
         String result = "";
         try {
@@ -95,6 +99,7 @@ public class Connection implements Runnable{
         return result;
     }
 
+    // параметры строки запроса
     private Map<String, List<String>> getQueryParams(String query) {
         if(query == null) return null;
         String name, value;
@@ -153,7 +158,6 @@ public class Connection implements Runnable{
     // обработка запроса
     @Override
     public void run() {
-        final List<String> allowedMethods = List.of("GET", "POST");
         try (
              final BufferedInputStream in = new BufferedInputStream(socket.getInputStream());
              final BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream()))
@@ -224,14 +228,20 @@ public class Connection implements Runnable{
                 in.skip(headersDelimiter.length);
                 // вычитываем Content-Length, чтобы прочитать body
                 final Optional<String> contentLength = extractHeader(headers, "Content-Length");
+                // есть контент
                 if (contentLength.isPresent()) {
+                    // тип контента
+                    final Optional<String> contentType = extractHeader(headers, "Content-Type");
+                    // размер контента
                     final int length = Integer.parseInt(contentLength.get());
                     final byte[] bodyBytes = in.readNBytes(length);
                     // тело запроса
                     final String body = new String(bodyBytes);
-                    System.out.println(body);
-                    // параметры из тела запроса
-                    bodyParams = getQueryParams(body);
+                    // нужный формат
+                    if(xwwwform.equals(contentType.get())) {
+                        // параметры из тела запроса
+                        bodyParams = getQueryParams(body);
+                    }
                     // ответ ОК 200
                     response200();
                 }
@@ -249,13 +259,10 @@ public class Connection implements Runnable{
                 // тип содержимого файла
                 final String mimeType = Files.probeContentType(filePath);
                 // отправка ответа
-                switch (validPaths) {
-                    case CLASSIC_HTML:
-                        responseClassicHtml(filePath, mimeType);
-                        break;
-                    default:
-                        responseDefaultGET(filePath, mimeType);
-                        break;
+                if (validPaths == ValidPaths.CLASSIC_HTML) {
+                    responseClassicHtml(filePath, mimeType);
+                } else {
+                    responseDefaultGET(filePath, mimeType);
                 }
             }
 
