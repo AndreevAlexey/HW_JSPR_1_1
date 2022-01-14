@@ -69,13 +69,22 @@ public class Request {
         return result;
     }
 
+    // получить список параметров из тела запроса
+    private static Map<String, List<String>> getPostParams(String contentType, String body) {
+        if(xwwwform.equals(contentType)) {
+            // параметры из тела запроса
+            return getQueryParams(body);
+        }
+        return null;
+    }
+
     // получить значение параметра
-    private String getParamValue(String name) {
+    private String getParamValue(Map<String, List<String>> params, String name) {
         // параметра нет в мапе
-        if(!queryParams.containsKey(name)) return null;
+        if(!params.containsKey(name)) return null;
         StringBuilder result = new StringBuilder();
         // список значений
-        List<String> values = queryParams.get(name);
+        List<String> values = params.get(name);
         switch (values.size()) {
             case 0:
                 break;
@@ -135,8 +144,6 @@ public class Request {
             if (!path.startsWith("/")) {
                 return null;
             }
-            System.out.println(requestLine[0]);
-            System.out.println(path);
 
             // ищем заголовки
             final byte[] headersDelimiter = new byte[]{'\r', '\n', '\r', '\n'};
@@ -168,13 +175,8 @@ public class Request {
                     final byte[] bodyBytes = in.readNBytes(length);
                     // тело запроса
                     final String body = new String(bodyBytes);
-                    System.out.println(body);
-                    // нужный формат
-                    if(xwwwform.equals(contentType.get())) {
-                        // параметры из тела запроса
-                        request.bodyParams = getQueryParams(body);
-                        System.out.println(request.bodyParams );
-                    }
+                    // параметры тела запроса
+                    request.bodyParams = getPostParams(contentType.get(), body);
                 }
             // GET
             } else {
