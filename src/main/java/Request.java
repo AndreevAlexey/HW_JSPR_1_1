@@ -89,7 +89,7 @@ public class Request {
     }
 
     // получить объект из строки запроса
-    public static Request getFromRequestLine(BufferedReader input) {
+    public static Request get(BufferedReader input) {
         // must be in form GET /path HTTP/1.1
         String requestLine = null;
         try {

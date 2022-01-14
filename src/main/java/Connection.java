@@ -17,7 +17,7 @@ public class Connection implements Runnable{
              final BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream()))
         {
             // запрос
-            Request request = Request.getFromRequestLine(input);
+            Request request = Request.get(input);
             // ответ
             Response response = new Response(output);
             // отправить ответ
