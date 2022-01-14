@@ -1,3 +1,5 @@
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -18,16 +20,8 @@ public class Request {
         return method;
     }
 
-    public void setMethod(String method) {
-        this.method = method;
-    }
-
     public ValidPaths getPath() {
         return path;
-    }
-
-    public void setPath(ValidPaths path) {
-        this.path = path;
     }
 
     // декодер
@@ -95,7 +89,16 @@ public class Request {
     }
 
     // получить объект из строки запроса
-    public static Request getFromRequestLine(String requestLine) {
+    public static Request getFromRequestLine(BufferedReader input) {
+        // must be in form GET /path HTTP/1.1
+        String requestLine = null;
+        try {
+            requestLine = input.readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        // проверка на пустую строку
+        if(requestLine == null) return null;
         final String[] parts = requestLine.split(" ");
         // проверка на формат строки
         if (parts.length != 3) {
@@ -107,7 +110,7 @@ public class Request {
         // метод
         request.method = parts[0];
         // путь к файлу
-        String path = "";
+        String path;
         try {
             URI uri = new URI(parts[1]);
             path = uri.getPath();
@@ -118,17 +121,11 @@ public class Request {
         } catch (URISyntaxException e) {
             e.printStackTrace();
         }
-        // ссылка на путь из списка доступных сервера
-        final ValidPaths validPaths = ValidPaths.getValueByPath(path);
         // проверка на наличие в списке доступных
-        if (validPaths == null) {
+        if (request.path == null) {
             return null;
         }
         return request;
     }
-    // проверки запроса
-    public boolean checkRequest() {
-        // проверка на наличие в списке доступных
-        return path != null;
-    }
+
 }

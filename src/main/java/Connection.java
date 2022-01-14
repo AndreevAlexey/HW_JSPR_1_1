@@ -16,12 +16,8 @@ public class Connection implements Runnable{
              final BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              final BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream()))
         {
-            // must be in form GET /path HTTP/1.1
-            final String requestLine = input.readLine();
-            // проверка на пустую строку
-            if(requestLine == null) return;
             // запрос
-            Request request = Request.getFromRequestLine(requestLine);
+            Request request = Request.getFromRequestLine(input);
             // ответ
             Response response = new Response(output);
             // отправить ответ
