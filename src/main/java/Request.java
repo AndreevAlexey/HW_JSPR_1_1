@@ -99,6 +99,16 @@ public class Request {
         return result.toString();
     }
 
+    // получить параметр строки запроса
+    public String getQueryParam(String name) {
+        return getParamValue(queryParams, name);
+    }
+
+    // получить параметр тела запроса
+    public String getPostParam(String name) {
+        return getParamValue(bodyParams, name);
+    }
+
     // получить объект из строки запроса
     public static Request get(BufferedInputStream in) {
         Request request = null;
