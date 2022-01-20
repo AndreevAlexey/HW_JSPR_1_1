@@ -47,7 +47,7 @@ public class Request {
         for(String param : params) {
             List<String> values = new ArrayList<>();
             // разбиваем на параметр и значение
-            name = param.split("=")[0];
+            name = decode(param.split("=")[0]);
             value = decode(param.split("=")[1]);
             // параметр уже присутствует в мапе
             if(result.containsKey(name)) {
@@ -118,6 +118,7 @@ public class Request {
             request.path = ValidPaths.getValueByPath(path);
             // параметры запроса
             request.queryParams = getQueryParams(uri.getRawQuery());
+            System.out.println(request.queryParams);
         } catch (URISyntaxException e) {
             e.printStackTrace();
         }
