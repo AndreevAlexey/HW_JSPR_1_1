@@ -85,7 +85,7 @@ public class Response {
     }
 
     // отправить ответ
-    public void send(Request request) {
+    public void sendOnRequest(Request request) {
         // проверка запроса
         if(request == null) {
             // ответ Error 404

@@ -21,7 +21,7 @@ public class Connection implements Runnable{
             // Ответ
             Response response = new Response(out);
             // отправить ответ клиенту
-            response.send(request);
+            response.sendOnRequest(request);
 
         } catch (IOException e) {
             e.printStackTrace();
